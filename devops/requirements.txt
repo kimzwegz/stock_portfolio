@@ -1,0 +1,13 @@
+pandas==1.3.5
+numpy
+spyder
+spyder-kernels
+pymongo
+jupyter
+openpyxl
+pydub
+plotly
+matplotlib
+scipy
+scikit-learn
+jsonschema

@@ -1,0 +1,11 @@
+config/api.json
+*.csv
+*.xls
+*.xlsx
+*.png
+conda_env/
+.DS_Store
+.ipynb_checkpoints
+.~*
+__pycache__/
+.ipynb_checkpoints/
