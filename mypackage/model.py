@@ -127,30 +127,20 @@ class Feature:
             col_delta = col_name+"_delta"
             col_new = col_name+"_change"
             col_log = col_name+"_logchange"
-            try:
-                if log==False:
-                    df[col_delta] = df[col_name] - df[col]
-
-
-                    # df.loc[denom_zero & nom_notzero, col_new] = df[col_delta] / 0.001
-                    
-                    # df.loc[nom_zero, col_new] = 0
-                    df[col_new] = df.apply(lambda row: self.ratio(row[col_delta], -row[col_name]), axis=1)
-                    # df[col_new] = df[col_delta] / - df[col_name]
-                    # df.insert(loc=df.shape[1],column= col_new, value= (df[col_name] - df[col]) / - df[col_name])
-                    # df.replace([np.inf, -np.inf], np.nan, inplace=True)
-                    # df[col_new] = (df[col_name] - df[col]) / - df[col_name]
-                else:
-                    df[col_log]=np.log(df[col] / df[col_name])
-                    # df.insert(loc=df.shape[1],column= col_log, value= np.log(df[col] / df[col_name]))
-                    df.replace([np.inf, -np.inf], np.nan, inplace=True)
-                
-                if drop ==True:
-                    df.drop(columns = col, inplace=True)
-                    df.drop(columns=col_name, inplace=True)
-            except Exception as e:
-                print(f'Error inserting {col_new}')
-                print(f'{e}\n')
+            # try:
+            if log==False:
+                df[col_delta] = df[col_name] - df[col]
+                df[col_new] = df.apply(lambda row: self.ratio(row[col_delta], -row[col_name]), axis=1)
+            else:
+                df[col_log]=np.log(df[col] / df[col_name])
+                df.replace([np.inf, -np.inf], np.nan, inplace=True)
+            
+            if drop ==True:
+                df.drop(columns = col, inplace=True)
+                df.drop(columns=col_name, inplace=True)
+            # except Exception as e:
+            #     print(f'Error inserting {col_new}')
+            #     print(f'{e}\n')
         return df
 
     def add_avg(self, df:pd.DataFrame = None, cols:list=None):
@@ -198,16 +188,20 @@ class Feature:
         
         else:
             df[col_replace] = df.apply(lambda row: sum([row[i] for i in by]), axis=1)
-        # tot = df.apply(lambda row: sum(row(args)), axis=1)
         return df
 
     def ratio(self, nom, denom):
-        if (denom == np.nan) or (nom == np.nan):
+        if nom == 0:
+            return 0
+        elif (denom == np.nan) or (nom == np.nan):
             return np.nan
         elif (denom == 0) & (nom != 0):
             return nom / 0.001
-        elif (denom !=0 or denom != np.nan) & (denom !=0 or denom != np.nan):
+        elif (denom !=0 or denom != np.nan) & (nom !=0 or nom != np.nan):
             return nom / denom
+        else:
+            print('unknown condition. check ratio method')
+            raise ValueError
             
 
     def add_ratio(self,df_input=None, **kwargs):
@@ -229,19 +223,10 @@ class Feature:
             # try:
             print(f'{col_ratio}: {kwargs[i][0]} , {kwargs[i][1]}')
 
-            ## add new column. if denom is zero then divide by a very small number
             df[col_ratio] = df.apply(lambda row: self.ratio(row[kwargs[i][0]] , row[kwargs[i][1]]), axis = 1)
-            # df.insert(loc=df.shape[1],column= i+"_ratio", value=(self.df[kwargs[i][0]] / self.df[kwargs[i][1]])) ## old ratio code
-            # df[col_ratio] = np.nan
-            # df.loc[self.df[kwargs[i][1]] == 0, col_ratio] = self.df[kwargs[i][0]] / 0.001
-            # df.loc[self.df[kwargs[i][1]] != 0, col_ratio] = self.df[kwargs[i][0]] / self.df[kwargs[i][1]]
-            # df.insert(loc=df.shape[1],column= i+"_ratio", value=(self.df[kwargs[i][0]] / self.df[kwargs[i][1]])) # old colmn insert
             rowsbefore = df.shape[0]
             
             df = df.loc[~((df[col_ratio].isna()) | (df[col_ratio] ==np.nan) | (df[col_ratio] == np.inf) | (df[col_ratio] == -np.inf) )] ## removing only no data
-            # df = df.loc[~( (df[col_ratio] ==0) | (df[col_ratio].isna()) | (df[col_ratio] ==np.nan) | (df[col_ratio] == np.inf) | (df[col_ratio] == -np.inf) )] ### removing no data and zeros
-            # df[col_ratio].replace([-np.inf, np.inf],0)
-
             rowsafter = df.shape[0]
             removed=rowsbefore-rowsafter
             rows += removed
