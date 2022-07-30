@@ -200,6 +200,15 @@ class Feature:
         # tot = df.apply(lambda row: sum(row(args)), axis=1)
         return df
 
+    def ratio(self, nom, denom):
+        if (denom == np.nan) or (nom == np.nan):
+            return np.nan
+        elif (denom == 0) & (nom != 0):
+            return nom / 0.001
+        elif (denom !=0 or denom != np.nan) & (denom !=0 or denom != np.nan):
+            return nom / denom
+            
+
     def add_ratio(self,df_input=None, **kwargs):
         df = df_input.copy()
         if df is None:
@@ -219,10 +228,12 @@ class Feature:
             # try:
             print(f'{col_ratio}: {kwargs[i][0]} , {kwargs[i][1]}')
 
-            ## add new column. if denom is zero then divide by a very small number 
-            df[col_ratio] = np.nan
-            df.loc[self.df[kwargs[i][1]] == 0, col_ratio] = self.df[kwargs[i][0]] / 0.001
-            df.loc[self.df[kwargs[i][1]] != 0, col_ratio] = self.df[kwargs[i][0]] / self.df[kwargs[i][1]]
+            ## add new column. if denom is zero then divide by a very small number
+            df[col_ratio] = df.apply(lambda row: self.ratio(row[kwargs[i][0]] , row[kwargs[i][1]]), axis = 1)
+            # df.insert(loc=df.shape[1],column= i+"_ratio", value=(self.df[kwargs[i][0]] / self.df[kwargs[i][1]])) ## old ratio code
+            # df[col_ratio] = np.nan
+            # df.loc[self.df[kwargs[i][1]] == 0, col_ratio] = self.df[kwargs[i][0]] / 0.001
+            # df.loc[self.df[kwargs[i][1]] != 0, col_ratio] = self.df[kwargs[i][0]] / self.df[kwargs[i][1]]
             # df.insert(loc=df.shape[1],column= i+"_ratio", value=(self.df[kwargs[i][0]] / self.df[kwargs[i][1]])) # old colmn insert
             rowsbefore = df.shape[0]
             
