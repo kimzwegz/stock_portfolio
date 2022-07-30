@@ -119,7 +119,8 @@ class Feature:
         df.reset_index(drop=False, inplace=True)
         return df
 
-    def change(self, df:pd.DataFrame, group:str, col_period:str, periods:int, col_shift: list, log=False, drop=False):
+    def change(self, df_input:pd.DataFrame, group:str, col_period:str, periods:int, col_shift: list, log=False, drop=False):
+        df = df_input.copy()
         df = self.shift(df, group, col_period, periods, col_shift)
         for col in col_shift:
             col_name = col+"_t-"+str(periods)
@@ -130,16 +131,14 @@ class Feature:
                 if log==False:
                     df[col_delta] = df[col_name] - df[col]
 
-                    nom_zero = df[col_delta]==0
-                    nom_notzero = df[df[col_delta]!=0]
-                    denom_zero = df[df[col_name]==0]
 
                     # df.loc[denom_zero & nom_notzero, col_new] = df[col_delta] / 0.001
                     
                     # df.loc[nom_zero, col_new] = 0
-                    df[col_new] = df[col_delta] / - df[col_name]
+                    df[col_new] = df.apply(lambda row: self.ratio(row[col_delta], -row[col_name]), axis=1)
+                    # df[col_new] = df[col_delta] / - df[col_name]
                     # df.insert(loc=df.shape[1],column= col_new, value= (df[col_name] - df[col]) / - df[col_name])
-                    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+                    # df.replace([np.inf, -np.inf], np.nan, inplace=True)
                     # df[col_new] = (df[col_name] - df[col]) / - df[col_name]
                 else:
                     df[col_log]=np.log(df[col] / df[col_name])
@@ -167,9 +166,11 @@ class Feature:
                 print('New DataFrame assigned')
                 for i in cols:
                     df['key_industry']=df['cal_yearperiod']+"."+df['industry-category']
-                    df_filter = df[i].notna()
-                    df_industry = df.loc[df_filter].groupby('key_industry')[i].mean().reset_index(name=i+"_indavg") ## New: remove na when calc averages
-                    df_global = df.loc[df_filter].groupby('cal_yearperiod')[i].mean().reset_index(name=i+"_globalavg") ## New: remove na when calc averages
+                    df_industry = df.groupby('key_industry')[i].mean().reset_index(name=i+"_indavg") ## New: remove na when calc averages
+                    df_global = df.groupby('cal_yearperiod')[i].mean().reset_index(name=i+"_globalavg") ## New: remove na when calc averages
+                    # df_filter = df[i].notna()
+                    # df_industry = df.loc[df_filter].groupby('key_industry')[i].mean().reset_index(name=i+"_indavg") ## New: remove na when calc averages
+                    # df_global = df.loc[df_filter].groupby('cal_yearperiod')[i].mean().reset_index(name=i+"_globalavg") ## New: remove na when calc averages
                     df = df.merge(df_industry, on = 'key_industry' , how = 'inner')
                     df = df.merge(df_global, on = 'cal_yearperiod' , how = 'inner')
                     df[i+"_excess_indavg"] = df[i] - df[i+"_indavg"]
@@ -342,6 +343,13 @@ class Feature:
             print(f'window {0}: train periods= {len(periods_train)} / test periods={len(periods_test)}')
 
         return l
+
+    def check_companyperiod(self, df, symbol='symbol' , year='year',col_period='cal_yearperiod', without_duplicates=False):
+        df_check = df.groupby([symbol, year])[col_period].count().reset_index()
+        if without_duplicates == False:
+            return df_check
+        else:
+            return df_check.loc[df_check[col_period]!=4]
 
 
 class Model(Feature):
