@@ -25,7 +25,8 @@ class FMP():
         "pnl": "https://financialmodelingprep.com/api/v4/income-statement-bulk",
         "bs": "https://financialmodelingprep.com/api/v4/balance-sheet-statement-bulk",
         "cf": "https://financialmodelingprep.com/api/v4/cash-flow-statement-bulk",
-        "profile":"https://financialmodelingprep.com/api/v4/profile/all"
+        "profile":"https://financialmodelingprep.com/api/v4/profile/all",
+        "cmdt": "https://financialmodelingprep.com/api/v3/symbol/available-commodities"
         }
     
     URL = {
@@ -34,7 +35,7 @@ class FMP():
         "fx": 'https://financialmodelingprep.com/api/v3/historical-price-full/',
         "idx_all" :"https://financialmodelingprep.com/api/v3/symbol/available-indexes",
         "mrktcap" : "https://financialmodelingprep.com/api/v3/historical-market-capitalization",
-        "indexes": "https://financialmodelingprep.com/api/v3/historical-price-full/%5E",
+        "indexes": "https://financialmodelingprep.com/api/v3/historical-price-full/%5E"
         }
     
     S = requests.Session()
@@ -52,6 +53,8 @@ class FMP():
         elif url_choice == "cf":
             url = FMP.URL_BULK[url_choice]
         elif url_choice =='profile' :
+            url = FMP.URL_BULK[url_choice]
+        elif url_choice == "cmdt":
             url = FMP.URL_BULK[url_choice]
         elif url_choice == 'price':
             url = FMP.URL[url_choice]
@@ -94,7 +97,7 @@ class FMP():
             r = s.request("GET" , url=url, params=params).content
             loads = json.loads(r)
         return loads
-    
+        
     def get_index (self, tickers: list , params = {}):
         l =[]
         l_notfound = []
@@ -236,6 +239,7 @@ class FMP():
               
     def session_bulk(self, url_choice: str, params = {} , **kwargs):
         url = self.get_url(url_choice)
+        print(url)
         params.update(kwargs)
         params["apikey"]=FMP.API_KEY
         params_print = params.copy()
@@ -243,14 +247,20 @@ class FMP():
         # print(params , params_print)
         with FMP.S as s:
             urls = s.request("GET" , url=url, params=params).url
-            # print(urls)
-            df = pd.read_csv(urls)
-            if df.shape[1] == 1:
-                print(f'no data in found for {params_print}')
-                pass
-            else:
-                print(f'found {df.shape[0]:,} rows : {df.shape[1]} columns for {params_print}')
-                return df
+            print(urls)
+            try:
+                r = s.request("GET" , url=url, params=params).content    
+                loads = json.loads(r)
+                df = pd.read_json(urls)
+            except ValueError:
+                print(loads)
+                df = pd.read_csv(urls)
+                if df.shape[1] == 1:
+                    print(f'no data in found for {params_print}')
+                    pass
+                else:
+                    print(f'found {df.shape[0]:,} rows : {df.shape[1]} columns for {params_print}')
+            return df
             
     def stock_price (self, tickers: list , timeS:int , params = {}):
         l =[]
@@ -432,6 +442,8 @@ pnl = fin.pnl
 bs = fin.bs
 cf = fin.cf
 profile = fin.profile
+cmdt_all = fin.cmdt_all
+cmdt_prices = fin.cmtd_prices
 prices = fin.prices
 fx = fin.fx
 mrktcap = fin.mrktcap
@@ -458,6 +470,8 @@ fin.prices_n_fin.create_index([("symbol" , ASCENDING),
 fin.idx_price.create_index([("symbol" , ASCENDING),
                             ("date" , ASCENDING)])
 
+fin.cmdt_prices.create_index([("symbol" , ASCENDING),
+                            ("date" , ASCENDING)])
 
 ############################# Instance Creation ###############################
 
@@ -465,6 +479,7 @@ if __name__ == "__main__":
     years = [1960 +i for i in range(63)]
     fmp = FMP(years , "quarter")
     symbols = pd.DataFrame(list(companyfinancials_list.find()))['symbol'].tolist()
+     
           
 ############################### Mrktcap ##################################
 
@@ -487,6 +502,12 @@ if __name__ == "__main__":
             
     
     fin.fx.insert_many(l_dict_currencies)
+    
+    
+############################## commodities ####################################
+
+    df_cmdt = fmp.session_bulk('cmdt')
+    fin.cmdt_all.insert_many(df_cmdt.to_dict('records'))
 
 ################################## Tests ######################################
     # test = ['AAPL' , 'MSFT']
