@@ -4,6 +4,7 @@ config/api.json
 *.xlsx
 *.png
 conda_env/
+stock_portfolio_env/
 .DS_Store
 .ipynb_checkpoints
 .~*

@@ -251,9 +251,9 @@ class FMP():
             try:
                 r = s.request("GET" , url=url, params=params).content    
                 loads = json.loads(r)
+                print(loads)
                 df = pd.read_json(urls)
             except ValueError:
-                print(loads)
                 df = pd.read_csv(urls)
                 if df.shape[1] == 1:
                     print(f'no data in found for {params_print}')
@@ -261,6 +261,57 @@ class FMP():
                 else:
                     print(f'found {df.shape[0]:,} rows : {df.shape[1]} columns for {params_print}')
             return df
+        
+    def price_tseries(self, url_choice, tickers: list, params = {}):
+        url = self.get_url(url_choice)
+        l =[]
+        l_notfound = []
+        counter = 0
+        no_tickers = len(tickers)
+        print(f'no of tickers: {no_tickers:,}')
+        for ticker in tickers:
+            url = FMP.URL["price"]+"/"+ticker         
+            params["apikey"]=FMP.API_KEY
+            params_print = params.copy()
+            del params_print['apikey']
+            # print(url, params)
+            with FMP.S as s:
+                urls = s.request("GET" , url=url, params=params).url
+                # print(urls)
+                r = s.request("GET" , url=url, params=params).content
+                loads = json.loads(r)
+                if len(loads)==0:
+                    print(f'no records found for {ticker} with {params_print}')
+                    l_notfound.append(ticker)
+                else:
+                    # print(len(loads))
+                    # return loads
+                    ticker = loads['symbol']
+                    history = loads['historical']
+                    symbol = {'symbol': ticker}
+                    
+        # return history
+                    for i in history:
+                        i.update(symbol)
+                        # del i['index']
+                    df = pd.DataFrame(history)
+                    print(f'found {df.shape[0]:,} rows for {ticker}')
+                    l.append(df)
+                    counter +=1
+                    # main.update(history)
+            # print(f'{counter} out of {no_tickers} tickers \n')
+        try:
+            df2 = pd.concat(l)
+            df2.reset_index(inplace=True)
+            print(f"dataframe complete. {df2.shape[0]:,} rows - {df2.shape[1]} columns")
+            df_dict = df2.to_dict("records")
+            print(f'mongo data ready. {len(df_dict):,} records \n')
+            return df2 , df_dict, l_notfound
+        except ValueError:
+            return ('no records to concatenate')
+        
+        
+        
             
     def stock_price (self, tickers: list , timeS:int , params = {}):
         l =[]
@@ -415,6 +466,8 @@ class MONGO_FIN():
         self.company = MONGO_FIN.__FIN.company_today
         self.companyfinancials_list = MONGO_FIN.__FIN.company_wfinancials
         self.profile = MONGO_FIN.__FIN.profile
+        self.cmdt_all = MONGO_FIN.__FIN.cmdt_all
+        self.cmdt_prices = MONGO_FIN.__FIN.cmdt_prices
         self.pnl = MONGO_FIN.__FIN.pnl
         self.bs = MONGO_FIN.__FIN.bs
         self.cf = MONGO_FIN.__FIN.cf
@@ -427,7 +480,7 @@ class MONGO_FIN():
         self.mldf = MONGO_FIN.__FIN.mldf
         self.mlstat = MONGO_FIN.__FIN.mlstat
         
-    def get_df(self, table):
+    def get_df(self, table, query: dict = None):
         df = pd.DataFrame(list(table.find()))
         return df
                        
@@ -478,12 +531,22 @@ fin.cmdt_prices.create_index([("symbol" , ASCENDING),
 if __name__ == "__main__":
     years = [1960 +i for i in range(63)]
     fmp = FMP(years , "quarter")
-    symbols = pd.DataFrame(list(companyfinancials_list.find()))['symbol'].tolist()
+    df_profile = fmp.session_bulk('profile')
+    symbols_fmp = df_profile.symbol.unique().tolist()
      
+    
+############################## commodities ####################################
+
+    df_cmdt = fmp.session_bulk('cmdt')
+    cmdt_l = df_cmdt.symbol.unique().tolist()
+    df_cmdt_prices = fmp.price_tseries('cmdt', cmdt_l, {"timeseries": 50*365})[0]
+    # fin.cmdt_all.insert_many(df_cmdt.to_dict('records'))
+    # fin.cmdt_prices.insert_many(df_cmdt_prices.to_dict('records'))
           
 ############################### Mrktcap ##################################
 
-    found , notfound = fmp.insertdb_mrktcap(fin.mrktcap, 1000, symbols)
+    symbols = pd.DataFrame(list(companyfinancials_list.find()))['symbol'].tolist()
+    # found , notfound = fmp.insertdb_mrktcap(fin.mrktcap, 1000, symbols)
 
 ############################### currency ######################################
     currencies = fin.bs.find().distinct("reportedCurrency")
@@ -504,11 +567,6 @@ if __name__ == "__main__":
     fin.fx.insert_many(l_dict_currencies)
     
     
-############################## commodities ####################################
-
-    df_cmdt = fmp.session_bulk('cmdt')
-    fin.cmdt_all.insert_many(df_cmdt.to_dict('records'))
-
 ################################## Tests ######################################
     # test = ['AAPL' , 'MSFT']
     # loads = fmp.stock_price_bulk(['AAPL' , 'MSFT'])
@@ -522,7 +580,6 @@ if __name__ == "__main__":
     df_cf , dict_cf = fmp.get_bulk_timeS('cf')
     df_bs , dict_bs = fmp.get_bulk_timeS('bs')
     df_pnl , dict_pnl = fmp.get_bulk_timeS('pnl')
-    df_profile = fmp.session_bulk('profile')
     finished = fin.prices.distinct("symbol")
     finished = set(finished)
     all_tickers = set(symbols)
